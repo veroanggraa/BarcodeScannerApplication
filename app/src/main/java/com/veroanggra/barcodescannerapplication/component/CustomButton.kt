@@ -32,7 +32,7 @@ fun CircleButton(size: Int, icon: Int, modifier: Modifier = Modifier, onClick: (
             painterResource(id = icon),
             contentDescription = "Flash",
             modifier = Modifier
-                .size(60.dp)
+                .size(30.dp)
                 .scale(1f) // Add scale modifier
         )
     }

@@ -91,13 +91,13 @@ class MainActivity : ComponentActivity() {
                     bottom.linkTo(parent.bottom, margin = 70.dp)
                     end.linkTo(cameraButton.start, margin = 30.dp)
                 },
-                    size = 80, icon = R.drawable.icon_gallery, onClick = {})
+                    size = 70, icon = R.drawable.icon_gallery, onClick = {})
 
                 CircleButton(modifier = Modifier.constrainAs(cameraButton) {
                     bottom.linkTo(parent.bottom, margin = 100.dp)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
-                }, size = 120, icon = R.drawable.icon_camera, onClick = {})
+                }, size = 80, icon = R.drawable.icon_camera, onClick = {})
 
                 CircleButton(
                     modifier = Modifier
@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                             start.linkTo(cameraButton.end, margin = 30.dp)
                             bottom.linkTo(parent.bottom, margin = 70.dp)
                         },
-                    size = 80,
+                    size = 70,
                     icon = if (enableFlash) R.drawable.icon_flash_off else R.drawable.icon_flash_on,
                     onClick = {
                         enableFlash = !enableFlash
@@ -119,13 +119,11 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun getCameraPreview(): PreviewView {
-        val options =
-            BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        val options = BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
         val barcodeScanner = BarcodeScanning.getClient(options)
         cameraController = LifecycleCameraController(this)
         val previewView = PreviewView(this)
-        cameraController.cameraSelector =
-            CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+        cameraController.cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
         cameraController.setImageAnalysisAnalyzer(
             Executors.newSingleThreadExecutor(),
             MlKitAnalyzer(
