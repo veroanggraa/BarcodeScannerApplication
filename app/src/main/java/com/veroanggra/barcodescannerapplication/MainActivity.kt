@@ -12,12 +12,11 @@ import androidx.camera.core.ImageAnalysis.COORDINATE_SYSTEM_VIEW_REFERENCED
 import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -28,9 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
+import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.core.content.ContextCompat
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -38,6 +38,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.veroanggra.barcodescannerapplication.component.CircleButton
 import com.veroanggra.barcodescannerapplication.ui.theme.BarcodeScannerApplicationTheme
 import java.util.concurrent.Executors
 
@@ -69,34 +70,50 @@ class MainActivity : ComponentActivity() {
             }
         } else {
             var enableFlash by remember { mutableStateOf(false) }
-            Box(modifier = Modifier.fillMaxSize()) {
+            ConstraintLayout(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth()
+            ) {
+                val (cameraPreview, galleryButton, cameraButton, flashButton) = createRefs()
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .constrainAs(cameraPreview) {
+                            top.linkTo(parent.top)
+                            bottom.linkTo(parent.bottom)
+                            start.linkTo(parent.start)
+                            end.linkTo(parent.end)
+                        },
                     factory = { getCameraPreview() })
+
+                CircleButton(modifier = Modifier.constrainAs(galleryButton) {
+                    bottom.linkTo(parent.bottom, margin = 70.dp)
+                    end.linkTo(cameraButton.start, margin = 30.dp)
+                },
+                    size = 80, icon = R.drawable.icon_gallery, onClick = {})
+
+                CircleButton(modifier = Modifier.constrainAs(cameraButton) {
+                    bottom.linkTo(parent.bottom, margin = 100.dp)
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                }, size = 120, icon = R.drawable.icon_camera, onClick = {})
+
                 CircleButton(
-                    modifier = Modifier.align(alignment = Alignment.BottomCenter),
-                    enableFlash = enableFlash,
+                    modifier = Modifier
+                        .constrainAs(flashButton) {
+                            start.linkTo(cameraButton.end, margin = 30.dp)
+                            bottom.linkTo(parent.bottom, margin = 70.dp)
+                        },
+                    size = 80,
+                    icon = if (enableFlash) R.drawable.icon_flash_off else R.drawable.icon_flash_on,
                     onClick = {
                         enableFlash = !enableFlash
                         cameraController.cameraControl?.enableTorch(enableFlash)
-                    })
+                    }
+                )
             }
         }
-    }
-
-    @Composable
-    fun CircleButton(enableFlash: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-        val vectorAsset =
-            if (enableFlash) R.drawable.baseline_flash_on else R.drawable.baseline_flash_off
-        Icon(
-            painterResource(id = vectorAsset),
-            contentDescription = "Flash",
-            modifier = modifier
-                .padding(bottom = 50.dp)
-                .size(64.dp)
-                .clickable {
-                    onClick()
-                })
     }
 
 
