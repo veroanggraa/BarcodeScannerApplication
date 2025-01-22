@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.veroanggra.barcodescannerapplication"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.veroanggra.barcodescannerapplication"
@@ -50,7 +50,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -59,13 +58,22 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.constraintlayout)
 
     // CameraX
     implementation(libs.camera.core)
     implementation(libs.camera.camera2)
     implementation(libs.camera.view)
 
-    // Mlkit
+    // MlKit
+    implementation(libs.camera.mlkit.vision)
+    implementation(libs.barcode.scanning)
+
+    // Accompanist
+    implementation(libs.accompanist.permissions)
+
+    // Lottie
+    implementation(libs.lottie.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
