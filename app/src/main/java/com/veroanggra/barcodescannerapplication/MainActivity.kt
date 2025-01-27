@@ -12,24 +12,27 @@ import androidx.camera.core.ImageAnalysis.COORDINATE_SYSTEM_VIEW_REFERENCED
 import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.core.content.ContextCompat
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -39,6 +42,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.veroanggra.barcodescannerapplication.component.CircleButton
+import com.veroanggra.barcodescannerapplication.component.CustomQrFrame
 import com.veroanggra.barcodescannerapplication.ui.theme.BarcodeScannerApplicationTheme
 import java.util.concurrent.Executors
 
@@ -75,7 +79,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxHeight()
                     .fillMaxWidth()
             ) {
-                val (cameraPreview, galleryButton, cameraButton, flashButton) = createRefs()
+                val (cameraPreview, galleryButton, flashButton, txtInstruction, scanFrame) = createRefs()
                 AndroidView(
                     modifier = Modifier
                         .fillMaxSize()
@@ -87,22 +91,29 @@ class MainActivity : ComponentActivity() {
                         },
                     factory = { getCameraPreview() })
 
+                Text(text = "Scan barcode", fontSize = 24.sp, color = Color.White, modifier = Modifier.constrainAs(txtInstruction) {
+                    start.linkTo(parent.start)
+                    top.linkTo(parent.top, margin = 100.dp)
+                    end.linkTo(parent.end)
+                })
+
+                CustomQrFrame(modifier = Modifier.constrainAs(scanFrame){
+                    top.linkTo(txtInstruction.bottom, 30.dp)
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                })
+
                 CircleButton(modifier = Modifier.constrainAs(galleryButton) {
+                    start.linkTo(parent.start, margin = 120.dp)
                     bottom.linkTo(parent.bottom, margin = 70.dp)
-                    end.linkTo(cameraButton.start, margin = 30.dp)
                 },
                     size = 70, icon = R.drawable.icon_gallery, onClick = {})
 
-                CircleButton(modifier = Modifier.constrainAs(cameraButton) {
-                    bottom.linkTo(parent.bottom, margin = 100.dp)
-                    start.linkTo(parent.start)
-                    end.linkTo(parent.end)
-                }, size = 80, icon = R.drawable.icon_camera, onClick = {})
 
                 CircleButton(
                     modifier = Modifier
                         .constrainAs(flashButton) {
-                            start.linkTo(cameraButton.end, margin = 30.dp)
+                            end.linkTo(parent.end, margin = 120.dp)
                             bottom.linkTo(parent.bottom, margin = 70.dp)
                         },
                     size = 70,
@@ -119,11 +130,13 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun getCameraPreview(): PreviewView {
-        val options = BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+        val options =
+            BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
         val barcodeScanner = BarcodeScanning.getClient(options)
         cameraController = LifecycleCameraController(this)
         val previewView = PreviewView(this)
-        cameraController.cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+        cameraController.cameraSelector =
+            CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
         cameraController.setImageAnalysisAnalyzer(
             Executors.newSingleThreadExecutor(),
             MlKitAnalyzer(
@@ -142,6 +155,13 @@ class MainActivity : ComponentActivity() {
                 val firstResult = barcodeResults.first()
                 val drawable = firstResult.boundingBox?.let {
                     QrCodeHighlightDrawable(it)
+                }
+                if (firstResult.valueType == Barcode.TYPE_URL) {
+                    val browserIntent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(firstResult.rawValue)
+                    )
+                    startActivity(browserIntent)
                 }
                 previewView.overlay.clear()
                 drawable?.let {
