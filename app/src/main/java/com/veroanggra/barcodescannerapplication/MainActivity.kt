@@ -2,21 +2,26 @@ package com.veroanggra.barcodescannerapplication
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis.COORDINATE_SYSTEM_VIEW_REFERENCED
 import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,9 +32,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -41,6 +45,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import com.veroanggra.barcodescannerapplication.component.CircleButton
 import com.veroanggra.barcodescannerapplication.component.CustomQrFrame
 import com.veroanggra.barcodescannerapplication.ui.theme.BarcodeScannerApplicationTheme
@@ -66,6 +71,41 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalPermissionsApi::class)
     @Composable
     fun CameraPreview() {
+        var enableFlash by remember { mutableStateOf(false) }
+        var isShowPopup by remember { mutableStateOf(false) }
+        var isShowGallery by remember { mutableStateOf(false) }
+        var barcodeData by remember { mutableStateOf("") }
+        val context = LocalContext.current
+        val barcodeScanner = remember { BarcodeScanning.getClient() }
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val uri = result.data?.data
+                if (uri != null) {
+                    val bitmap = if (Build.VERSION.SDK_INT < 28) {
+                        MediaStore.Images.Media.getBitmap(
+                            context.contentResolver,
+                            uri
+                        )
+                    } else {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source)
+                    }
+                    val image = InputImage.fromBitmap(bitmap, 0)
+                    barcodeScanner.process(image)
+                        .addOnSuccessListener { barcodes ->
+                            if (barcodes.isNotEmpty()) {
+                                val firstResult = barcodes.first()
+                                barcodeData = firstResult.rawValue ?: ""
+                                isShowPopup = true
+                            }
+                        }
+                }
+            }
+        }
+
         // check camera permission
         val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
         if (!cameraPermissionState.status.isGranted) {
@@ -73,7 +113,6 @@ class MainActivity : ComponentActivity() {
                 cameraPermissionState.launchPermissionRequest()
             }
         } else {
-            var enableFlash by remember { mutableStateOf(false) }
             ConstraintLayout(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -89,15 +128,24 @@ class MainActivity : ComponentActivity() {
                             start.linkTo(parent.start)
                             end.linkTo(parent.end)
                         },
-                    factory = { getCameraPreview() })
+                    factory = {
+                        getCameraPreview(onBarcodeData = { data ->
+                            barcodeData = data
+                            isShowPopup = true
+                        })
+                    })
 
-                Text(text = "Scan barcode", fontSize = 24.sp, color = Color.White, modifier = Modifier.constrainAs(txtInstruction) {
-                    start.linkTo(parent.start)
-                    top.linkTo(parent.top, margin = 100.dp)
-                    end.linkTo(parent.end)
-                })
+                Text(
+                    text = "Scan barcode",
+                    fontSize = 24.sp,
+                    color = Color.White,
+                    modifier = Modifier.constrainAs(txtInstruction) {
+                        start.linkTo(parent.start)
+                        top.linkTo(parent.top, margin = 100.dp)
+                        end.linkTo(parent.end)
+                    })
 
-                CustomQrFrame(modifier = Modifier.constrainAs(scanFrame){
+                CustomQrFrame(modifier = Modifier.constrainAs(scanFrame) {
                     top.linkTo(txtInstruction.bottom, 30.dp)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
@@ -107,7 +155,9 @@ class MainActivity : ComponentActivity() {
                     start.linkTo(parent.start, margin = 120.dp)
                     bottom.linkTo(parent.bottom, margin = 70.dp)
                 },
-                    size = 70, icon = R.drawable.icon_gallery, onClick = {})
+                    size = 70, icon = R.drawable.icon_gallery, onClick = {
+                        isShowGallery = true
+                    })
 
 
                 CircleButton(
@@ -125,13 +175,35 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        if (isShowPopup) {
+            AlertDialog(
+                onDismissRequest = { isShowPopup = false },
+                title = { Text("Barcode Data") },
+                text = { Text(barcodeData) },
+                confirmButton = {
+                    Button(onClick = { isShowPopup = false }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+        if (isShowGallery) {
+            LaunchedEffect(Unit) {
+                val galleryIntent = Intent(
+                    Intent.ACTION_PICK,
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                )
+                launcher.launch(galleryIntent)
+                isShowGallery = false
+            }
+        }
     }
 
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun getCameraPreview(): PreviewView {
+    private fun getCameraPreview(onBarcodeData: (String) -> Unit): PreviewView {
         val options =
-            BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+            BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS).build()
         val barcodeScanner = BarcodeScanning.getClient(options)
         cameraController = LifecycleCameraController(this)
         val previewView = PreviewView(this)
@@ -162,6 +234,9 @@ class MainActivity : ComponentActivity() {
                         Uri.parse(firstResult.rawValue)
                     )
                     startActivity(browserIntent)
+                } else {
+                    onBarcodeData(firstResult.rawValue ?: "")
+
                 }
                 previewView.overlay.clear()
                 drawable?.let {
