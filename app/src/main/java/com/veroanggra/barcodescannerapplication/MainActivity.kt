@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,7 +49,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.veroanggra.barcodescannerapplication.component.CircleButton
-import com.veroanggra.barcodescannerapplication.component.CustomQrFrame
+import com.veroanggra.barcodescannerapplication.component.CustomScanFrame
 import com.veroanggra.barcodescannerapplication.ui.theme.BarcodeScannerApplicationTheme
 import java.util.concurrent.Executors
 
@@ -145,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         end.linkTo(parent.end)
                     })
 
-                CustomQrFrame(modifier = Modifier.constrainAs(scanFrame) {
+                CustomScanFrame(modifier = Modifier.constrainAs(scanFrame) {
                     top.linkTo(txtInstruction.bottom, 30.dp)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
@@ -181,7 +183,12 @@ class MainActivity : ComponentActivity() {
                 title = { Text("Barcode Data") },
                 text = { Text(barcodeData) },
                 confirmButton = {
-                    Button(onClick = { isShowPopup = false }) {
+                    Button(
+                        onClick = { isShowPopup = false }, colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF008000),
+                            contentColor = Color.White
+                        )
+                    ) {
                         Text("OK")
                     }
                 }
@@ -198,7 +205,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
 
     @SuppressLint("ClickableViewAccessibility")
     private fun getCameraPreview(onBarcodeData: (String) -> Unit): PreviewView {
