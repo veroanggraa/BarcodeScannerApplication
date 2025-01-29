@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun CustomQrFrame(modifier: Modifier) {
+fun CustomScanFrame(modifier: Modifier) {
     Canvas(
         modifier = modifier
             .padding(horizontal = 10.dp)

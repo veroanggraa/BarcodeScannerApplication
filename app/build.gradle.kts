@@ -72,8 +72,6 @@ dependencies {
     // Accompanist
     implementation(libs.accompanist.permissions)
 
-    // Lottie
-    implementation(libs.lottie.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
