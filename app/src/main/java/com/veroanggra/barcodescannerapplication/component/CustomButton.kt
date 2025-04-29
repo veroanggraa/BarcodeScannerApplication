@@ -15,7 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun CircleButton(size: Int, icon: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun CircleButton(size: Int, icon: Int, modifier: Modifier = Modifier, onClick: () -> Unit, contentDescription: String) {
     Button(
         onClick = { onClick() },
         shape = CircleShape,
@@ -30,7 +30,7 @@ fun CircleButton(size: Int, icon: Int, modifier: Modifier = Modifier, onClick: (
     ) {
         Icon(
             painterResource(id = icon),
-            contentDescription = "Flash",
+            contentDescription = contentDescription,
             modifier = Modifier
                 .size(30.dp)
                 .scale(1f) // Add scale modifier
