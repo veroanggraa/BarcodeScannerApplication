@@ -14,6 +14,6 @@ data class CameraUiState(
     val detectedBarcodeValue: String?
         get() = detectedBarcode?.rawValue
 
-    val detectedBarcodeType: Rect?
+    val detectedBarcodeBoundingBox: Rect?
         get() = detectedBarcode?.boundingBox
 }
