@@ -6,7 +6,6 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.veroanggra.barcodescannerapplication.repositories.BarcodeRepository
-import kotlinx.coroutines.flow.Flow
 
 class ScanBarcodeUseCase(private val barcodeRepository: BarcodeRepository) {
     fun execute(
