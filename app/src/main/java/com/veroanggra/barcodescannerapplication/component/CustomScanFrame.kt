@@ -19,53 +19,56 @@ fun CustomScanFrame(modifier: Modifier) {
             .padding(horizontal = 10.dp)
             .fillMaxSize()
     ) {
-        val width = size.width
-        val height = 1000f
-        val cornerRadius = 40.dp.toPx() // Changed to 40dp
+        val canvasWidth = size.width
+        val canvasHeight = size.height
+        val frameSize = 300.dp.toPx() // Define the size of the square frame
+        val cornerRadius = 40.dp.toPx() // Radius of the rounded corners
         val strokeWidth = 4.dp.toPx()
-        val horizontalPadding = (width - (width - 300f)) / 2
-        val verticalPadding = 100f
 
-        // Top-left
+        // Calculate the top-left corner of the square frame to center it
+        val frameTopLeftX = (canvasWidth - frameSize) / 2
+        val frameTopLeftY = (canvasHeight - frameSize) / 2
+
+        // Top-left corner arc
         drawArc(
             color = Color.White,
             startAngle = 180f,
             sweepAngle = 90f,
             useCenter = false,
-            topLeft = Offset(horizontalPadding, verticalPadding),
-            size = Size(cornerRadius * 2, cornerRadius * 2),
+            topLeft = Offset(frameTopLeftX, frameTopLeftY),
+            size = Size(cornerRadius * 2, cornerRadius * 2), // Size of the bounding box for the arc
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
 
-        // Top-right
+        // Top-right corner arc
         drawArc(
             color = Color.White,
             startAngle = 270f,
             sweepAngle = 90f,
             useCenter = false,
-            topLeft = Offset(width - horizontalPadding - cornerRadius * 2, verticalPadding),
+            topLeft = Offset(frameTopLeftX + frameSize - cornerRadius * 2, frameTopLeftY),
             size = Size(cornerRadius * 2, cornerRadius * 2),
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
 
-        // Bottom-left
+        // Bottom-left corner arc
         drawArc(
             color = Color.White,
             startAngle = 90f,
             sweepAngle = 90f,
             useCenter = false,
-            topLeft = Offset(horizontalPadding, verticalPadding + height - cornerRadius * 2),
+            topLeft = Offset(frameTopLeftX, frameTopLeftY + frameSize - cornerRadius * 2),
             size = Size(cornerRadius * 2, cornerRadius * 2),
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
 
-        // Bottom-right
+        // Bottom-right corner arc
         drawArc(
             color = Color.White,
             startAngle = 0f,
             sweepAngle = 90f,
             useCenter = false,
-            topLeft = Offset(width - horizontalPadding - cornerRadius * 2, verticalPadding + height - cornerRadius * 2),
+            topLeft = Offset(frameTopLeftX + frameSize - cornerRadius * 2, frameTopLeftY + frameSize - cornerRadius * 2),
             size = Size(cornerRadius * 2, cornerRadius * 2),
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         )
