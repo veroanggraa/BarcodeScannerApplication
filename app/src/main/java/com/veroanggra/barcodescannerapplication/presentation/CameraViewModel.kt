@@ -40,6 +40,7 @@ class CameraViewModel(
         _uiState.update {
             it.copy(
                 isLoading = false,
+                selectedGalleryImageUri = null,
                 errorMessage = "An unexpected error occurred: ${throwable.localizedMessage}"
             )
         }
@@ -67,29 +68,32 @@ class CameraViewModel(
     }
 
     private fun handleAnalyzerResult(barcodes: List<Barcode>?) {
+
+        if (uiState.value.selectedGalleryImageUri != null || uiState.value.isLoading) return
+
         if (barcodes == null) {
             Log.w(TAG, "Analyzer returned null result for a frame")
             return
         }
         val firstValidBarcode = barcodes.firstOrNull {
-            !it.rawValue.isNullOrEmpty()
+            !it.rawValue.isNullOrBlank()
         }
         if (uiState.value.detectedBarcode?.rawValue != firstValidBarcode?.rawValue ||
             uiState.value.detectedBarcode?.boundingBox != firstValidBarcode?.boundingBox
         ) {
             Log.d(TAG, "Analyzer detected: ${firstValidBarcode?.rawValue}")
-            updateStateWithBarcode(firstValidBarcode)
+            updateStateWithBarcode(firstValidBarcode, showDialog = false)
         } else if (firstValidBarcode == null && uiState.value.detectedBarcode != null) {
             Log.d(TAG, "Analyzer: Barcode disappeared")
-            updateStateWithBarcode(null)
+            updateStateWithBarcode(null, showDialog = false)
         }
     }
 
-    private fun updateStateWithBarcode(barcode: Barcode?) {
+    private fun updateStateWithBarcode(barcode: Barcode?, showDialog: Boolean) {
         _uiState.update { currentState ->
             currentState.copy(
                 detectedBarcode = barcode,
-                showBarcodeResultDialog = barcode != null
+                showBarcodeResultDialog = if (showDialog) barcode != null else currentState.showBarcodeResultDialog
             )
         }
     }
@@ -117,6 +121,78 @@ class CameraViewModel(
                 Log.e(TAG, "Failed to toggle flash", e)
                 _uiState.update { it.copy(errorMessage = "Failed to control flash") }
             }
+        }
+    }
+
+    fun onGalleryImageSelected(uri: Uri?) {
+        if (uri == null) {
+            _uiState.update { it.copy(errorMessage = "Failed to get image form gallery") }
+            return
+        }
+        Log.d(TAG, "Gallery image selected: $uri")
+        _uiState.update {
+            it.copy(
+                selectedGalleryImageUri = uri,
+                isLoading = false,
+                errorMessage = null,
+                detectedBarcode = null,
+                showBarcodeResultDialog = false
+            )
+        }
+    }
+
+    fun confirmGalleryImageSelected(context: Context) {
+        val uriToProcess = uiState.value.selectedGalleryImageUri ?: run {
+            Log.e(TAG, "Confirm called but no image URI selected in state")
+            _uiState.update { it.copy(errorMessage = "No image selected to confirm") }
+            return
+        }
+        Log.d(TAG, "Confirming gallery image: $uriToProcess")
+        viewModelScope.launch(coroutineExceptionHandler) {
+            processGalleryImageUseCase.execute(context, uriToProcess)
+                .onStart {
+                    Log.d(TAG, "Starting gallery image processing after confirmation")
+                    _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+                }
+                .catch { e ->
+                    Log.e(TAG, "Error processing confirmed gallery image flow", e)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            selectedGalleryImageUri = null,
+                            errorMessage = "Error processing image: ${e.localizedMessage}"
+                        )
+                    }
+                }
+                .collect { barcodeResult ->
+                    Log.d(
+                        TAG,
+                        "Confirmed gallery image processed. Result: ${barcodeResult?.rawValue}"
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+//                            selectedGalleryImageUri = null,
+                            detectedBarcode = barcodeResult,
+                            showBarcodeResultDialog = barcodeResult != null,
+                            errorMessage = if (barcodeResult == null) "No barcode found .in image" else null
+                        )
+                    }
+
+                }
+        }
+    }
+
+    fun cancelGalleryImageSelection() {
+        Log.d(TAG, "Cancelling gallery image selection")
+        _uiState.update {
+            it.copy(
+                selectedGalleryImageUri = null,
+                detectedBarcode = null,
+                showBarcodeResultDialog = false,
+                isLoading = false,
+                errorMessage = null
+            )
         }
     }
 
@@ -159,8 +235,16 @@ class CameraViewModel(
     }
 
     fun dismissBarcodeDialog() {
+        val wasShowingGalleryResult = uiState.value.selectedGalleryImageUri != null
         _uiState.update {
-            it.copy(showBarcodeResultDialog = false)
+            it.copy(
+                showBarcodeResultDialog = false,
+                selectedGalleryImageUri = if (wasShowingGalleryResult) null else it.selectedGalleryImageUri,
+                detectedBarcode = if (wasShowingGalleryResult) null else it.detectedBarcode
+            )
+        }
+        if (wasShowingGalleryResult) {
+            Log.d(TAG, "Dialog dismissed, returning camera from gallery confirmation")
         }
     }
 
