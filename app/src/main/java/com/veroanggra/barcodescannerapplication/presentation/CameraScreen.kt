@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +24,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +61,7 @@ import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
@@ -75,7 +85,7 @@ fun CameraScreen(viewModel: CameraViewModel = koinViewModel()) {
     val galleryLauncher =
         rememberLauncherForActivityResult(contract = ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == android.app.Activity.RESULT_OK) {
-                viewModel.processGalleryUri(context, result.data?.data)
+                viewModel.onGalleryImageSelected(result.data?.data)
             } else {
                 Log.d("CameraScreen", "Gallery selection cencelled or failed")
             }
@@ -88,52 +98,67 @@ fun CameraScreen(viewModel: CameraViewModel = koinViewModel()) {
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        val snackbarHostState = remember { SnackbarHostState() }
+        val snackBarHostState = remember { SnackbarHostState() }
         Box(modifier = Modifier.fillMaxSize()) {
-            if (cameraPermissionState.status.isGranted) {
-                CameraContent(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    lifecycleOwner = lifecycleOwner,
-                    onGalleryClick = {
-                        val galleryIntent = Intent(
-                            Intent.ACTION_PICK,
-                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                        ).apply { type = "image/*" }
-                        galleryLauncher.launch(galleryIntent)
-                    },
-                    onFlashClick = { viewModel.toggleFlash(context) },
-                    onDismissDialog = { viewModel.dismissBarcodeDialog() },
-                    onOpenLink = { url ->
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            Log.e("Camera Screen", "Failed to Open Url: $url", e)
-                        }
-                    },
-                    onCopyText = { text ->
-                        context.setClipboard("Barcode", text)
-                        viewModel.showSnackbarMessage("Copied to clipboard")
-                    }
-                )
+            if (uiState.selectedGalleryImageUri == null) {
+                if (cameraPermissionState.status.isGranted) {
+                    CameraContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        lifecycleOwner = lifecycleOwner,
+                        onGalleryClick = {
+                            val galleryIntent = Intent(
+                                Intent.ACTION_PICK,
+                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                            ).apply { type = "image/*" }
+                            galleryLauncher.launch(galleryIntent)
+                        },
+                        onFlashClick = { viewModel.toggleFlash(context) }
+                    )
+                } else {
+                    PermissionDeniedContent(cameraPermissionState)
+                }
             } else {
-                PermissionDeniedContent(cameraPermissionState)
+                GalleryImageConfirmation(
+                    imageUri = uiState.selectedGalleryImageUri!!,
+                    onConfirm = { viewModel.confirmGalleryImageSelected(context) },
+                    onCancel = { viewModel.cancelGalleryImageSelection() }
+                )
             }
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
             SnackbarHost(
-                hostState = snackbarHostState,
+                hostState = snackBarHostState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             )
         }
+
+        if (uiState.showBarcodeResultDialog && uiState.detectedBarcode != null) {
+            BarcodeResultDialog(
+                barcode = uiState.detectedBarcode,
+                onDismiss = { viewModel.dismissBarcodeDialog() },
+                onOpenLink = { url ->
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e("CameraScreen", "Failed to Open URL: $url", e)
+                        viewModel.showSnackbarMessage("Could not open link")
+                    }
+                },
+                onCopyText = { text ->
+                    context.setClipboard("Barcode", text)
+                    viewModel.showSnackbarMessage("Copied to clipboard")
+                }
+            )
+        }
         uiState.errorMessage?.let { message ->
             LaunchedEffect(message) {
-                snackbarHostState.showSnackbar(
+                snackBarHostState.showSnackbar(
                     message = message,
                     duration = SnackbarDuration.Short
                 )
@@ -142,7 +167,7 @@ fun CameraScreen(viewModel: CameraViewModel = koinViewModel()) {
         }
         uiState.analyzerError?.let { message ->
             LaunchedEffect(message) {
-                snackbarHostState.showSnackbar(
+                snackBarHostState.showSnackbar(
                     message = "Analyzer: $message",
                     duration = SnackbarDuration.Indefinite
                 )
@@ -158,10 +183,7 @@ fun CameraContent(
     viewModel: CameraViewModel,
     lifecycleOwner: LifecycleOwner,
     onGalleryClick: () -> Unit,
-    onFlashClick: () -> Unit,
-    onDismissDialog: () -> Unit,
-    onOpenLink: (String) -> Unit,
-    onCopyText: (String) -> Unit
+    onFlashClick: () -> Unit
 ) {
     val context = LocalContext.current
     val cameraController = remember { LifecycleCameraController(context) }
@@ -202,7 +224,7 @@ fun CameraContent(
     ConstraintLayout(
         modifier = Modifier.fillMaxSize()
     ) {
-        val (cameraPreview, buttonsRow, txtInstruction, scanFrame) = createRefs()
+        val (cameraPreview, buttonsRow, txtInstruction, scanFrame, txtResult) = createRefs()
 
         AndroidView(
             factory = { previewView },
@@ -216,10 +238,12 @@ fun CameraContent(
                 },
             update = { view ->
                 view.overlay.clear()
-                uiState.detectedBarcodeBoundingBox?.let { bounds ->
-                    if (!bounds.isEmpty) { // Avoid drawing empty rects
-                        val drawable = QrCodeHighlightDrawable(bounds) // Use your drawable
-                        view.overlay.add(drawable)
+                if (uiState.selectedGalleryImageUri == null) {
+                    uiState.detectedBarcodeBoundingBox?.let { bounds ->
+                        if (!bounds.isEmpty) { // Avoid drawing empty rects
+                            val drawable = QrCodeHighlightDrawable(bounds) // Use your drawable
+                            view.overlay.add(drawable)
+                        }
                     }
                 }
             }
@@ -240,57 +264,119 @@ fun CameraContent(
                 .systemBarsPadding()
         )
 
-        CustomScanFrame(modifier = Modifier.constrainAs(scanFrame) {
-            top.linkTo(txtInstruction.bottom, 30.dp)
-            start.linkTo(parent.start)
-            end.linkTo(parent.end)
-            bottom.linkTo(buttonsRow.top, 30.dp)
-            width = Dimension.percent(0.7f)
-            height = Dimension.ratio("1:1")
-        })
-
-        Row(
-            modifier = Modifier
-                .constrainAs(buttonsRow) {
-                    start.linkTo(parent.start)
-                    end.linkTo(parent.end)
-                    bottom.linkTo(parent.bottom)
-                }
-                .fillMaxWidth()
-                .padding(bottom = 50.dp, start = 20.dp, end = 20.dp)
-                .systemBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircleButton(
-                size = 70,
-                icon = R.drawable.icon_gallery,
-                onClick = onGalleryClick,
-                contentDescription = "Open Gallery"
-            )
-
-            CircleButton(
-                size = 70,
-                icon = if (uiState.isFlashEnabled) R.drawable.icon_flash_off else R.drawable.icon_flash_on,
-                onClick = onFlashClick,
-                contentDescription = if (uiState.isFlashEnabled) "Turn Flash Off" else "Turn Flash On"
+        if (uiState.detectedBarcodeValue != null && uiState.selectedGalleryImageUri == null) {
+            Text(
+                text = "Result: ${uiState.detectedBarcodeValue}",
+                color = Color.White,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .constrainAs(txtResult) {
+                        top.linkTo(txtInstruction.bottom, margin = 8.dp)
+                        start.linkTo(parent.start, margin = 16.dp)
+                        end.linkTo(parent.end, margin = 16.dp)
+                        width = Dimension.fillToConstraints
+                    }
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             )
         }
-    }
 
-    if (uiState.showBarcodeResultDialog && uiState.detectedBarcode != null) {
-        BarcodeResultDialog(
-            barcode = uiState.detectedBarcode,
-            onDismiss = onDismissDialog,
-            onOpenLink = onOpenLink,
-            onCopyText = onCopyText
-        )
+        if (uiState.selectedGalleryImageUri == null) {
+            CustomScanFrame(modifier = Modifier.constrainAs(scanFrame) {
+                val topMargin = if (uiState.detectedBarcodeValue != null && uiState.selectedGalleryImageUri == null) 20.dp else 30.dp
+                val topAnchor =
+                    if (uiState.detectedBarcodeValue != null) txtResult.bottom else txtInstruction.bottom
+
+                top.linkTo(topAnchor, margin = topMargin)
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+                bottom.linkTo(buttonsRow.top, 30.dp)
+                width = Dimension.percent(0.7f)
+                height = Dimension.ratio("1:1")
+            })
+        }
+
+        if (uiState.selectedGalleryImageUri == null) {
+            Row(
+                modifier = Modifier
+                    .constrainAs(buttonsRow) {
+                        start.linkTo(parent.start)
+                        end.linkTo(parent.end)
+                        bottom.linkTo(parent.bottom)
+                    }
+                    .fillMaxWidth()
+                    .padding(bottom = 50.dp, start = 20.dp, end = 20.dp)
+                    .systemBarsPadding(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircleButton(
+                    size = 70,
+                    icon = R.drawable.icon_gallery,
+                    onClick = onGalleryClick,
+                    contentDescription = "Open Gallery"
+                )
+
+                CircleButton(
+                    size = 70,
+                    icon = if (uiState.isFlashEnabled) R.drawable.icon_flash_off else R.drawable.icon_flash_on,
+                    onClick = onFlashClick,
+                    contentDescription = if (uiState.isFlashEnabled) "Turn Flash Off" else "Turn Flash On"
+                )
+            }
+        }
     }
 }
 
 @Composable
+fun GalleryImageConfirmation(imageUri: Uri, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        Image(
+            painter = rememberAsyncImagePainter(imageUri),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 100.dp),
+            contentScale = ContentScale.Fit
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 30.dp, start = 20.dp, end = 20.dp)
+                .systemBarsPadding(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = onCancel,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Cancel")
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Cancel")
+            }
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Filled.CheckCircle, contentDescription = "Confirm")
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Confirm")
+            }
+        }
+    }
+
+
+}
+
+@Composable
 fun BarcodeResultDialog(
-    barcode: Barcode,
+    barcode: Barcode?,
     onDismiss: () -> Unit,
     onOpenLink: (String) -> Unit,
     onCopyText: (String) -> Unit
@@ -299,18 +385,21 @@ fun BarcodeResultDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
-                painter = painterResource(id = R.drawable.icon_gallery),
+                painter = painterResource(id = android.R.drawable.ic_dialog_info),
                 contentDescription = "Barcode"
             )
         },
         title = { Text("Barcode Detected") },
         text = {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Text("Type: ${getBarcodeTypeName(barcode.valueType)}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Type: ${getBarcodeTypeName(barcode?.valueType!!)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Data:", style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = barcode.rawValue ?: "N/A",
+                    text = barcode?.rawValue ?: "N/A",
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -322,7 +411,7 @@ fun BarcodeResultDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (barcode.valueType == Barcode.TYPE_URL && barcode.rawValue != null) {
+                if (barcode?.valueType == Barcode.TYPE_URL && barcode.rawValue != null) {
                     TextButton(onClick = {
                         onOpenLink(barcode.rawValue!!)
                         onDismiss()
@@ -330,7 +419,7 @@ fun BarcodeResultDialog(
                         Text("Open Link")
                     }
                 }
-                barcode.rawValue?.let {
+                barcode?.rawValue?.let {
                     TextButton(onClick = {
                         onCopyText(it)
                         onDismiss()
@@ -365,7 +454,7 @@ fun getBarcodeTypeName(type: Int): String {
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionDeniedContent(
-    cameraPermissionState: PermissionState // Use PermissionState directly
+    cameraPermissionState: PermissionState
 ) {
     Column(
         modifier = Modifier
