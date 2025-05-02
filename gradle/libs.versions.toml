@@ -16,6 +16,7 @@ lottie = "4.0.0"
 constraintlayoutVersion = "1.1.0"
 coroutineVersion = "1.7.3"
 koinVersion = "3.5.3"
+coilVersion = "2.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -43,8 +44,7 @@ lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", versio
 kotlinx-coroutines-android = {group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutineVersion"}
 koin-android = {group = "io.insert-koin", name = "koin-android", version.ref = "koinVersion"}
 koin-androidx-compose = {group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koinVersion"}
-
-
+coil-compose = {group = "io.coil-kt", name = "coil-compose", version.ref = "coilVersion"}
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
